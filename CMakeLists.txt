@@ -3,6 +3,12 @@
 
 cmake_minimum_required(VERSION 3.16)
 
+set (RELEASE_SERVICE_VERSION_MAJOR "26")
+set (RELEASE_SERVICE_VERSION_MINOR "07")
+set (RELEASE_SERVICE_VERSION_MICRO "70")
+set (RELEASE_SERVICE_VERSION "${RELEASE_SERVICE_VERSION_MAJOR}.${RELEASE_SERVICE_VERSION_MINOR}.${RELEASE_SERVICE_VERSION_MICRO}")
+project(xdg-portal-location-integration VERSION ${RELEASE_SERVICE_VERSION})
+
 find_package(ECM 6.25 REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 
@@ -15,6 +21,13 @@ include(KDECompilerSettings NO_POLICY_SCOPE)
 include(ECMQmlModule)
 include(ECMGenerateExportHeader)
 include(ECMGenerateHeaders)
+
+ecm_setup_version(PROJECT
+    VARIABLE_PREFIX KNMEASERVER
+    VERSION_HEADER knmeaserver_version.h
+    PACKAGE_VERSION_FILE "${CMAKE_CURRENT_BINARY_DIR}/KNMEAServerConfigVersion.cmake"
+    SOVERSION 1
+)
 
 find_package(Qt6 REQUIRED COMPONENTS Network)
 find_package(KF6 REQUIRED COMPONENTS DNSSD)

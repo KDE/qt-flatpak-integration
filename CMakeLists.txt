@@ -21,6 +21,7 @@ include(KDECompilerSettings NO_POLICY_SCOPE)
 include(ECMQmlModule)
 include(ECMGenerateExportHeader)
 include(ECMGenerateHeaders)
+include(ECMAddTests)
 
 ecm_setup_version(PROJECT
     VARIABLE_PREFIX KNMEASERVER
@@ -29,7 +30,8 @@ ecm_setup_version(PROJECT
     SOVERSION 1
 )
 
-find_package(Qt6 REQUIRED COMPONENTS Network)
-find_package(KF6 REQUIRED COMPONENTS DNSSD)
+find_package(Qt6 REQUIRED COMPONENTS Network Quick Test)
+find_package(KF6 REQUIRED COMPONENTS DNSSD Kirigami)
 
 add_subdirectory(src)
+add_subdirectory(autotests)

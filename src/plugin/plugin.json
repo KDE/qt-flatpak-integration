@@ -1,0 +1,9 @@
+{
+    "Keys": ["xdg"],
+    "Provider": "xdg",
+    "Position": true,
+    "Satellite": false,
+    "Monitor": false,
+    "Priority": 1001,
+    "Testable": false
+}

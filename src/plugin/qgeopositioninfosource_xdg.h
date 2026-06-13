@@ -1,0 +1,32 @@
+/*
+    SPDX-FileCopyrightText: 2026 Volker Krause <vkrause@kde.org>
+    SPDX-License-Identifier: LGPL-2.0-or-later
+*/
+
+#ifndef QGEOPOSITIONINFOSOURCE_XDG_H
+#define QGEOPOSITIONINFOSOURCE_XDG_H
+
+#include <QtPositioning/QGeoPositionInfoSource>
+#include <QtCore/QPointer>
+
+QT_BEGIN_NAMESPACE
+
+class QGeoPositionInfoSourceXdg : public QGeoPositionInfoSource
+{
+    Q_OBJECT
+public:
+    explicit QGeoPositionInfoSourceXdg(const QVariantMap &parameters, QObject *parent = nullptr);
+    ~QGeoPositionInfoSourceXdg();
+
+    QGeoPositionInfo lastKnownPosition(bool fromSatellitePositioningMethodsOnly = false) const override;
+    PositioningMethods supportedPositioningMethods() const override;
+    int minimumUpdateInterval() const override;
+    Error error() const override;
+    void startUpdates() override;
+    void stopUpdates() override;
+    void requestUpdate(int timeout) override;
+};
+
+QT_END_NAMESPACE
+
+#endif

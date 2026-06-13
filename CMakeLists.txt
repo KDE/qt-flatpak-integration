@@ -30,7 +30,7 @@ ecm_setup_version(PROJECT
     SOVERSION 1
 )
 
-find_package(Qt6 REQUIRED COMPONENTS Network Quick Test)
+find_package(Qt6 REQUIRED COMPONENTS DBus Location Network Positioning Quick Test)
 find_package(KF6 REQUIRED COMPONENTS DNSSD Kirigami)
 
 add_subdirectory(src)

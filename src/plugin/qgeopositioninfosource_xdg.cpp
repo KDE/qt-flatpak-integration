@@ -37,7 +37,7 @@ int QGeoPositionInfoSourceXdg::minimumUpdateInterval() const
 
 QGeoPositionInfoSource::Error QGeoPositionInfoSourceXdg::error() const
 {
-    return {};
+    return QGeoPositionInfoSource::NoError;
 }
 
 void QGeoPositionInfoSourceXdg::startUpdates()

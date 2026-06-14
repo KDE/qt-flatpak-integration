@@ -33,5 +33,7 @@ ecm_setup_version(PROJECT
 find_package(Qt6 REQUIRED COMPONENTS DBus Location Network Positioning Quick Test)
 find_package(KF6 REQUIRED COMPONENTS DNSSD Kirigami)
 
+find_file(XDG_LOCATION_XML NAME org.freedesktop.portal.Location.xml PATH_SUFFIXES share/dbus-1/interfaces REQUIRED)
+
 add_subdirectory(src)
 add_subdirectory(autotests)

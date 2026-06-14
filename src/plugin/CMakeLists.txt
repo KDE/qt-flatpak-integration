@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: BSD-2-Clause
 
 add_library(libqtposition_xdg MODULE)
+qt6_add_dbus_interface(xdg_iface_srcs ${XDG_LOCATION_XML} locationinterface)
 target_sources(libqtposition_xdg PRIVATE
     qgeopositioninfosource_xdg.cpp
     qgeopositioninfosourcefactory_xdg.cpp
+    ${xdg_iface_srcs}
 )
 target_link_libraries(libqtposition_xdg PRIVATE Qt::DBus Qt::Positioning)
 

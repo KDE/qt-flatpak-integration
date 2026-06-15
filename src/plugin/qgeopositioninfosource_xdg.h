@@ -6,10 +6,10 @@
 #ifndef QGEOPOSITIONINFOSOURCE_XDG_H
 #define QGEOPOSITIONINFOSOURCE_XDG_H
 
-#include <QtPositioning/QGeoPositionInfoSource>
-#include <QtCore/QPointer>
+#include <QGeoPositionInfoSource>
 
 class OrgFreedesktopPortalLocationInterface;
+class OrgFreedesktopPortalSessionInterface;
 
 QT_BEGIN_NAMESPACE
 
@@ -33,8 +33,11 @@ public:
 private:
     void locationUpdated(const QDBusObjectPath &handle, const QVariantMap &location);
 
-    OrgFreedesktopPortalLocationInterface *m_interface = nullptr;
+    std::unique_ptr<OrgFreedesktopPortalLocationInterface> m_interface;
+    std::unique_ptr<OrgFreedesktopPortalSessionInterface> m_session;
+
     QGeoPositionInfo m_lastPos;
+    QGeoPositionInfoSource::Error m_error = NoError;
 };
 
 QT_END_NAMESPACE

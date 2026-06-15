@@ -34,6 +34,7 @@ find_package(Qt6 REQUIRED COMPONENTS DBus Location Network Positioning Quick Tes
 find_package(KF6 REQUIRED COMPONENTS DNSSD Kirigami)
 
 find_file(XDG_LOCATION_XML NAME org.freedesktop.portal.Location.xml PATH_SUFFIXES share/dbus-1/interfaces REQUIRED)
+find_file(XDG_SESSION_XML NAME org.freedesktop.portal.Session.xml PATH_SUFFIXES share/dbus-1/interfaces REQUIRED)
 
 add_subdirectory(src)
 add_subdirectory(autotests)

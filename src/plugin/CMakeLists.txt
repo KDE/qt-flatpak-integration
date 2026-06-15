@@ -3,6 +3,7 @@
 
 add_library(libqtposition_xdg MODULE)
 qt6_add_dbus_interface(xdg_iface_srcs ${XDG_LOCATION_XML} locationinterface)
+qt6_add_dbus_interface(xdg_iface_srcs ${XDG_SESSION_XML} sessioninterface)
 target_sources(libqtposition_xdg PRIVATE
     qgeopositioninfosource_xdg.cpp
     qgeopositioninfosourcefactory_xdg.cpp

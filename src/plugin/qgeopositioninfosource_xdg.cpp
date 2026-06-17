@@ -113,9 +113,11 @@ void QGeoPositionInfoSourceXdg::locationUpdated([[maybe_unused]] const QDBusObje
     qDebug() << "UPDATE" << handle << location;
     QGeoCoordinate coord(
         location.value("Latitude"_L1).toDouble(),
-        location.value("Longitude"_L1).toDouble(),
-        location.value("Altitude"_L1).toDouble()
+        location.value("Longitude"_L1).toDouble()
     );
+    if (const auto alt = location.value("Altitude"_L1).toDouble(); !std::isnan(alt) && alt > std::numeric_limits<double>::lowest()) {
+        coord.setAltitude(alt);
+    }
     m_lastPos = {};
     m_lastPos.setCoordinate(coord);
     m_lastPos.setAttribute(QGeoPositionInfo::GroundSpeed, location.value("Speed"_L1).toDouble());

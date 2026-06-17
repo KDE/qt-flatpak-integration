@@ -6,6 +6,7 @@
 #include "qgeopositioninfosource_xdg.h"
 
 #include "locationinterface.h"
+#include "requestinterface.h"
 #include "sessioninterface.h"
 
 #include <QDBusConnection>
@@ -67,18 +68,34 @@ void QGeoPositionInfoSourceXdg::startUpdates()
         m_error = QGeoPositionInfoSource::ClosedError;
         Q_EMIT errorOccurred(m_error);
         m_session.reset();
+        m_request.reset();
         m_interface.reset();
     });
     QVariantMap startArgs{
-        { "handle_token"_L1, u"2"_s } // TODO
+        { "handle_token"_L1, QUuid::createUuid().toString(QUuid::Id128) }
     };
-    m_interface->Start(h, {}, startArgs);
+    const QDBusObjectPath req = m_interface->Start(h, {}, startArgs);
+    qDebug() << req;
+    m_request = std::make_unique<OrgFreedesktopPortalRequestInterface>(PORTAL_SERVICE_NAME, req.path(), QDBusConnection::sessionBus());
+    connect(m_request.get(), &OrgFreedesktopPortalRequestInterface::Response, this, [this](auto response, const auto &results) {
+        qDebug() << "request response" << response << results;
+        if (response != 0) {
+            m_error = QGeoPositionInfoSource::AccessError; // TODO diferentiate response codes
+            Q_EMIT errorOccurred(m_error);
+            m_session.reset();
+            m_interface.reset();
+        }
+        m_request.release()->deleteLater();
+    });
     m_error = QGeoPositionInfoSource::NoError;
 }
 
 void QGeoPositionInfoSourceXdg::stopUpdates()
 {
     qDebug() << "STOP";
+    if (m_request) {
+        m_request->Close();
+    }
     if (m_session) {
         m_session->Close();
     }

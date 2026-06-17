@@ -9,6 +9,7 @@
 #include <QGeoPositionInfoSource>
 
 class OrgFreedesktopPortalLocationInterface;
+class OrgFreedesktopPortalRequestInterface;
 class OrgFreedesktopPortalSessionInterface;
 
 QT_BEGIN_NAMESPACE
@@ -34,6 +35,7 @@ private:
     void locationUpdated(const QDBusObjectPath &handle, const QVariantMap &location);
 
     std::unique_ptr<OrgFreedesktopPortalLocationInterface> m_interface;
+    std::unique_ptr<OrgFreedesktopPortalRequestInterface> m_request;
     std::unique_ptr<OrgFreedesktopPortalSessionInterface> m_session;
 
     QGeoPositionInfo m_lastPos;

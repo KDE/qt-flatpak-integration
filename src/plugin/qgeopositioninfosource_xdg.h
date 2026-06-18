@@ -7,6 +7,7 @@
 #define QGEOPOSITIONINFOSOURCE_XDG_H
 
 #include <QGeoPositionInfoSource>
+#include <QTimer>
 
 class OrgFreedesktopPortalLocationInterface;
 class OrgFreedesktopPortalRequestInterface;
@@ -32,6 +33,8 @@ public:
     void requestUpdate(int timeout) override;
 
 private:
+    void connectToPortal();
+    void setError(QGeoPositionInfoSource::Error error);
     void locationUpdated(const QDBusObjectPath &handle, const QVariantMap &location);
 
     std::unique_ptr<OrgFreedesktopPortalLocationInterface> m_interface;
@@ -40,6 +43,8 @@ private:
 
     QGeoPositionInfo m_lastPos;
     QGeoPositionInfoSource::Error m_error = NoError;
+
+    QTimer m_requestTimer;
 };
 
 QT_END_NAMESPACE

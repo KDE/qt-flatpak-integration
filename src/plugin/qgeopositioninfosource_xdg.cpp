@@ -20,6 +20,8 @@ static constexpr inline const auto PORTAL_SERVICE_NAME = "org.freedesktop.portal
 QGeoPositionInfoSourceXdg::QGeoPositionInfoSourceXdg(const QVariantMap &parameters, QObject *parent)
     : QGeoPositionInfoSource(parent)
 {
+    m_requestTimer.setSingleShot(true);
+    connect(&m_requestTimer, &QTimer::timeout, this, &QGeoPositionInfoSourceXdg::stopUpdates);
 }
 
 QGeoPositionInfoSourceXdg::~QGeoPositionInfoSourceXdg() = default;
@@ -50,44 +52,11 @@ QGeoPositionInfoSource::Error QGeoPositionInfoSourceXdg::error() const
 
 void QGeoPositionInfoSourceXdg::startUpdates()
 {
-    // TODO
     qDebug() << "START";
-    m_interface = std::make_unique<OrgFreedesktopPortalLocationInterface>(PORTAL_SERVICE_NAME, u"/org/freedesktop/portal/desktop"_s, QDBusConnection::sessionBus());
-    connect(m_interface.get(), &OrgFreedesktopPortalLocationInterface::LocationUpdated, this, &QGeoPositionInfoSourceXdg::locationUpdated);
-    QVariantMap args{
-        { "session_handle_token"_L1, QUuid::createUuid().toString(QUuid::Id128) },
-        { "distance-threshold"_L1, 0 },
-        { "time-threshold"_L1, updateInterval() / 1000 },
-        { "accuracy"_L1, 5 }, // TODO
-    };
-    const QDBusObjectPath h = m_interface->CreateSession(args);
-    qDebug() << h;
-    m_session = std::make_unique<OrgFreedesktopPortalSessionInterface>(PORTAL_SERVICE_NAME, h.path(), QDBusConnection::sessionBus());
-    connect(m_session.get(), &OrgFreedesktopPortalSessionInterface::Closed, this, [this](const auto &args) {
-        qDebug() << "session closed" << args;
-        m_error = QGeoPositionInfoSource::ClosedError;
-        Q_EMIT errorOccurred(m_error);
-        m_session.reset();
-        m_request.reset();
-        m_interface.reset();
-    });
-    QVariantMap startArgs{
-        { "handle_token"_L1, QUuid::createUuid().toString(QUuid::Id128) }
-    };
-    const QDBusObjectPath req = m_interface->Start(h, {}, startArgs);
-    qDebug() << req;
-    m_request = std::make_unique<OrgFreedesktopPortalRequestInterface>(PORTAL_SERVICE_NAME, req.path(), QDBusConnection::sessionBus());
-    connect(m_request.get(), &OrgFreedesktopPortalRequestInterface::Response, this, [this](auto response, const auto &results) {
-        qDebug() << "request response" << response << results;
-        if (response != 0) {
-            m_error = QGeoPositionInfoSource::AccessError; // TODO diferentiate response codes
-            Q_EMIT errorOccurred(m_error);
-            m_session.reset();
-            m_interface.reset();
-        }
-        m_request.release()->deleteLater();
-    });
-    m_error = QGeoPositionInfoSource::NoError;
+    m_requestTimer.stop();
+    if (!m_interface) {
+        connectToPortal();
+    }
 }
 
 void QGeoPositionInfoSourceXdg::stopUpdates()
@@ -101,11 +70,77 @@ void QGeoPositionInfoSourceXdg::stopUpdates()
     }
     m_session.reset();
     m_interface.reset();
+    m_requestTimer.stop();
 }
 
 void QGeoPositionInfoSourceXdg::requestUpdate(int timeout)
 {
     qDebug() << "SINGLE REQUEST" << timeout;
+    if (m_interface && !m_requestTimer.isActive()) {
+        // already permanently started
+        return;
+    }
+
+    m_requestTimer.stop();
+    connectToPortal();
+    m_requestTimer.setInterval(timeout);
+    m_requestTimer.start();
+}
+
+void QGeoPositionInfoSourceXdg::connectToPortal()
+{
+    qDebug() << "CONNECT TO PORTAL";
+    setError(QGeoPositionInfoSource::NoError);
+
+    m_interface = std::make_unique<OrgFreedesktopPortalLocationInterface>(PORTAL_SERVICE_NAME, u"/org/freedesktop/portal/desktop"_s, QDBusConnection::sessionBus());
+    connect(m_interface.get(), &OrgFreedesktopPortalLocationInterface::LocationUpdated, this, &QGeoPositionInfoSourceXdg::locationUpdated);
+    QVariantMap args{
+        { "session_handle_token"_L1, QUuid::createUuid().toString(QUuid::Id128) },
+        { "distance-threshold"_L1, 0 },
+        { "time-threshold"_L1, updateInterval() / 1000 },
+        { "accuracy"_L1, 5 }, // TODO
+    };
+    const auto createSessionReply = m_interface->CreateSession(args);
+    const auto createSessionReplyWatcher = new QDBusPendingCallWatcher(createSessionReply, this);
+    connect(createSessionReplyWatcher, &QDBusPendingCallWatcher::finished, this, [this](auto watcher) {
+        watcher->deleteLater();
+        const QDBusPendingReply<QDBusObjectPath> createSessionReply = *watcher;
+        const QDBusObjectPath sessionHandle = createSessionReply;
+        qDebug() << "got portal session" << sessionHandle;
+        m_session = std::make_unique<OrgFreedesktopPortalSessionInterface>(PORTAL_SERVICE_NAME, sessionHandle.path(), QDBusConnection::sessionBus());
+        connect(m_session.get(), &OrgFreedesktopPortalSessionInterface::Closed, this, [this](const auto &args) {
+            qDebug() << "portal session closed" << args;
+            setError(QGeoPositionInfoSource::ClosedError);
+            m_session.reset();
+            m_request.reset();
+            m_interface.reset();
+        });
+        QVariantMap startArgs{
+            { "handle_token"_L1, QUuid::createUuid().toString(QUuid::Id128) }
+        };
+        // TODO make async
+        const QDBusObjectPath req = m_interface->Start(sessionHandle, {}, startArgs);
+        qDebug() << req;
+        m_request = std::make_unique<OrgFreedesktopPortalRequestInterface>(PORTAL_SERVICE_NAME, req.path(), QDBusConnection::sessionBus());
+        connect(m_request.get(), &OrgFreedesktopPortalRequestInterface::Response, this, [this](auto response, const auto &results) {
+            qDebug() << "request response" << response << results;
+            if (response != 0) {
+                setError(QGeoPositionInfoSource::AccessError); // TODO diferentiate response codes?
+                m_session.reset();
+                m_interface.reset();
+            }
+            m_request.release()->deleteLater();
+        });
+    });
+}
+
+void QGeoPositionInfoSourceXdg::setError(QGeoPositionInfoSource::Error error)
+{
+    if (m_error == error) {
+        return;
+    }
+    m_error = error;
+    Q_EMIT errorOccurred(error);
 }
 
 void QGeoPositionInfoSourceXdg::locationUpdated([[maybe_unused]] const QDBusObjectPath &handle, const QVariantMap &location)

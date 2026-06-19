@@ -118,18 +118,23 @@ void QGeoPositionInfoSourceXdg::connectToPortal()
         QVariantMap startArgs{
             { "handle_token"_L1, QUuid::createUuid().toString(QUuid::Id128) }
         };
-        // TODO make async
-        const QDBusObjectPath req = m_interface->Start(sessionHandle, {}, startArgs);
-        qDebug() << req;
-        m_request = std::make_unique<OrgFreedesktopPortalRequestInterface>(PORTAL_SERVICE_NAME, req.path(), QDBusConnection::sessionBus());
-        connect(m_request.get(), &OrgFreedesktopPortalRequestInterface::Response, this, [this](auto response, const auto &results) {
-            qDebug() << "request response" << response << results;
-            if (response != 0) {
-                setError(QGeoPositionInfoSource::AccessError); // TODO diferentiate response codes?
-                m_session.reset();
-                m_interface.reset();
-            }
-            m_request.release()->deleteLater();
+        const auto requestReply = m_interface->Start(sessionHandle, {}, startArgs);
+        const auto requestReplyWatcher = new QDBusPendingCallWatcher(requestReply, this);
+        connect(requestReplyWatcher, &QDBusPendingCallWatcher::finished, this, [this](auto watcher) {
+            watcher->deleteLater();
+            const QDBusPendingReply<QDBusObjectPath> requestReply = *watcher;
+            const QDBusObjectPath reqHandle = requestReply;
+            qDebug() << "portal request created:" << reqHandle;
+            m_request = std::make_unique<OrgFreedesktopPortalRequestInterface>(PORTAL_SERVICE_NAME, reqHandle.path(), QDBusConnection::sessionBus());
+            connect(m_request.get(), &OrgFreedesktopPortalRequestInterface::Response, this, [this](auto response, const auto &results) {
+                qDebug() << "request response" << response << results;
+                if (response != 0) {
+                    setError(QGeoPositionInfoSource::AccessError); // TODO diferentiate response codes?
+                    m_session.reset();
+                    m_interface.reset();
+                }
+                m_request.release()->deleteLater();
+            });
         });
     });
 }

@@ -12,6 +12,8 @@ project(xdg-portal-location-integration VERSION ${RELEASE_SERVICE_VERSION})
 find_package(ECM 6.25 REQUIRED NO_MODULE)
 set(CMAKE_MODULE_PATH ${ECM_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 
+set(CMAKE_CXX_STANDARD 23)
+
 include(FeatureSummary)
 include(ECMSetupVersion)
 include(KDEInstallDirs)
@@ -20,6 +22,7 @@ include(KDECMakeSettings)
 include(KDECompilerSettings NO_POLICY_SCOPE)
 include(ECMQmlModule)
 include(ECMGenerateExportHeader)
+include(ECMQtDeclareLoggingCategory)
 include(ECMGenerateHeaders)
 include(ECMAddTests)
 

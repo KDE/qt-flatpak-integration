@@ -31,6 +31,15 @@ enum XdgAccuracy {
 QGeoPositionInfoSourceXdg::QGeoPositionInfoSourceXdg(const QVariantMap &parameters, QObject *parent)
     : QGeoPositionInfoSource(parent)
 {
+    m_parentWindowId = parameters.value("parentWindowId"_L1).toString();
+    // TODO do we have chance to determine this ourselves?
+    /* given a window and linking to Qt::Gui we apparently can:
+    auto services = QGuiApplicationPrivate::platformIntegration()->services();
+    if (auto unixServices = dynamic_cast<QDesktopUnixServices *>(services)) {
+        return unixServices->portalWindowIdentifier(window);
+    }
+    */
+
     m_requestTimer.setSingleShot(true);
     connect(&m_requestTimer, &QTimer::timeout, this, &QGeoPositionInfoSourceXdg::stopUpdates);
 }
@@ -120,7 +129,7 @@ void QGeoPositionInfoSourceXdg::connectToPortal()
         qCDebug(Log) << "got portal session" << sessionHandle;
         m_session = std::make_unique<OrgFreedesktopPortalSessionInterface>(PORTAL_SERVICE_NAME, sessionHandle.path(), QDBusConnection::sessionBus());
         connect(m_session.get(), &OrgFreedesktopPortalSessionInterface::Closed, this, [this](const auto &args) {
-            qDebug() << "portal session closed" << args;
+            qCInfo(Log) << "portal session closed" << args;
             setError(QGeoPositionInfoSource::ClosedError);
             m_session.reset();
             m_request.reset();
@@ -129,7 +138,8 @@ void QGeoPositionInfoSourceXdg::connectToPortal()
         QVariantMap startArgs{
             { "handle_token"_L1, QUuid::createUuid().toString(QUuid::Id128) }
         };
-        const auto requestReply = m_interface->Start(sessionHandle, {}, startArgs);
+        qCDebug(Log) << "starting portal request" << m_parentWindowId << startArgs;
+        const auto requestReply = m_interface->Start(sessionHandle, m_parentWindowId, startArgs);
         const auto requestReplyWatcher = new QDBusPendingCallWatcher(requestReply, this);
         connect(requestReplyWatcher, &QDBusPendingCallWatcher::finished, this, [this](auto watcher) {
             watcher->deleteLater();

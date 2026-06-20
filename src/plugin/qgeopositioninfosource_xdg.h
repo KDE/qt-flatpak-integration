@@ -24,10 +24,10 @@ public:
     explicit QGeoPositionInfoSourceXdg(const QVariantMap &parameters, QObject *parent = nullptr);
     ~QGeoPositionInfoSourceXdg();
 
-    QGeoPositionInfo lastKnownPosition(bool fromSatellitePositioningMethodsOnly) const override;
-    PositioningMethods supportedPositioningMethods() const override;
-    int minimumUpdateInterval() const override;
-    Error error() const override;
+    [[nodiscard]] QGeoPositionInfo lastKnownPosition(bool fromSatellitePositioningMethodsOnly) const override;
+    [[nodiscard]] PositioningMethods supportedPositioningMethods() const override;
+    [[nodiscard]] int minimumUpdateInterval() const override;
+    [[nodiscard]] Error error() const override;
     void startUpdates() override;
     void stopUpdates() override;
     void requestUpdate(int timeout) override;
@@ -36,6 +36,8 @@ private:
     void connectToPortal();
     void setError(QGeoPositionInfoSource::Error error);
     void locationUpdated(const QDBusObjectPath &handle, const QVariantMap &location);
+
+    QString m_parentWindowId;
 
     std::unique_ptr<OrgFreedesktopPortalLocationInterface> m_interface;
     std::unique_ptr<OrgFreedesktopPortalRequestInterface> m_request;

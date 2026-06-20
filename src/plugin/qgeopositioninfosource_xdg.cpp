@@ -19,6 +19,15 @@ using namespace Qt::Literals;
 
 static constexpr inline const auto PORTAL_SERVICE_NAME = "org.freedesktop.portal.Desktop"_L1;
 
+enum XdgAccuracy {
+    NONE = 0,
+    COUNTRY = 1,
+    CITY = 2,
+    NEIGHBORHOOD = 3,
+    STREET = 4,
+    EXACT = 5
+};
+
 QGeoPositionInfoSourceXdg::QGeoPositionInfoSourceXdg(const QVariantMap &parameters, QObject *parent)
     : QGeoPositionInfoSource(parent)
 {
@@ -91,7 +100,6 @@ void QGeoPositionInfoSourceXdg::requestUpdate(int timeout)
 
 void QGeoPositionInfoSourceXdg::connectToPortal()
 {
-    qCDebug(Log) << "connecting to portal";
     setError(QGeoPositionInfoSource::NoError);
 
     m_interface = std::make_unique<OrgFreedesktopPortalLocationInterface>(PORTAL_SERVICE_NAME, u"/org/freedesktop/portal/desktop"_s, QDBusConnection::sessionBus());
@@ -100,8 +108,9 @@ void QGeoPositionInfoSourceXdg::connectToPortal()
         { "session_handle_token"_L1, QUuid::createUuid().toString(QUuid::Id128) },
         { "distance-threshold"_L1, 0 },
         { "time-threshold"_L1, updateInterval() / 1000 },
-        { "accuracy"_L1, 5 }, // TODO
+        { "accuracy"_L1, preferredPositioningMethods() & QGeoPositionInfoSource::SatellitePositioningMethods ? XdgAccuracy::EXACT : XdgAccuracy::CITY },
     };
+    qCDebug(Log) << "creating session" << args;
     const auto createSessionReply = m_interface->CreateSession(args);
     const auto createSessionReplyWatcher = new QDBusPendingCallWatcher(createSessionReply, this);
     connect(createSessionReplyWatcher, &QDBusPendingCallWatcher::finished, this, [this](auto watcher) {

@@ -9,6 +9,8 @@
 #include "requestinterface.h"
 #include "sessioninterface.h"
 
+#include "logging.h"
+
 #include <QDBusConnection>
 #include <QDebug>
 #include <QUuid>
@@ -52,7 +54,7 @@ QGeoPositionInfoSource::Error QGeoPositionInfoSourceXdg::error() const
 
 void QGeoPositionInfoSourceXdg::startUpdates()
 {
-    qDebug() << "START";
+    qCInfo(Log) << "startUpdates()";
     m_requestTimer.stop();
     if (!m_interface) {
         connectToPortal();
@@ -61,7 +63,7 @@ void QGeoPositionInfoSourceXdg::startUpdates()
 
 void QGeoPositionInfoSourceXdg::stopUpdates()
 {
-    qDebug() << "STOP";
+    qCInfo(Log) << "stopUpdates()";
     if (m_request) {
         m_request->Close();
     }
@@ -75,7 +77,7 @@ void QGeoPositionInfoSourceXdg::stopUpdates()
 
 void QGeoPositionInfoSourceXdg::requestUpdate(int timeout)
 {
-    qDebug() << "SINGLE REQUEST" << timeout;
+    qCInfo(Log) << "requestUpdate" << timeout;
     if (m_interface && !m_requestTimer.isActive()) {
         // already permanently started
         return;
@@ -89,7 +91,7 @@ void QGeoPositionInfoSourceXdg::requestUpdate(int timeout)
 
 void QGeoPositionInfoSourceXdg::connectToPortal()
 {
-    qDebug() << "CONNECT TO PORTAL";
+    qCDebug(Log) << "connecting to portal";
     setError(QGeoPositionInfoSource::NoError);
 
     m_interface = std::make_unique<OrgFreedesktopPortalLocationInterface>(PORTAL_SERVICE_NAME, u"/org/freedesktop/portal/desktop"_s, QDBusConnection::sessionBus());
@@ -106,7 +108,7 @@ void QGeoPositionInfoSourceXdg::connectToPortal()
         watcher->deleteLater();
         const QDBusPendingReply<QDBusObjectPath> createSessionReply = *watcher;
         const QDBusObjectPath sessionHandle = createSessionReply;
-        qDebug() << "got portal session" << sessionHandle;
+        qCDebug(Log) << "got portal session" << sessionHandle;
         m_session = std::make_unique<OrgFreedesktopPortalSessionInterface>(PORTAL_SERVICE_NAME, sessionHandle.path(), QDBusConnection::sessionBus());
         connect(m_session.get(), &OrgFreedesktopPortalSessionInterface::Closed, this, [this](const auto &args) {
             qDebug() << "portal session closed" << args;
@@ -124,10 +126,10 @@ void QGeoPositionInfoSourceXdg::connectToPortal()
             watcher->deleteLater();
             const QDBusPendingReply<QDBusObjectPath> requestReply = *watcher;
             const QDBusObjectPath reqHandle = requestReply;
-            qDebug() << "portal request created:" << reqHandle;
+            qCDebug(Log) << "portal request created:" << reqHandle;
             m_request = std::make_unique<OrgFreedesktopPortalRequestInterface>(PORTAL_SERVICE_NAME, reqHandle.path(), QDBusConnection::sessionBus());
             connect(m_request.get(), &OrgFreedesktopPortalRequestInterface::Response, this, [this](auto response, const auto &results) {
-                qDebug() << "request response" << response << results;
+                qCDebug(Log) << "request response" << response << results;
                 if (response != 0) {
                     setError(QGeoPositionInfoSource::AccessError); // TODO diferentiate response codes?
                     m_session.reset();
@@ -150,7 +152,7 @@ void QGeoPositionInfoSourceXdg::setError(QGeoPositionInfoSource::Error error)
 
 void QGeoPositionInfoSourceXdg::locationUpdated([[maybe_unused]] const QDBusObjectPath &handle, const QVariantMap &location)
 {
-    qDebug() << "UPDATE" << handle << location;
+    qCDebug(Log) << "got position update" << handle << location;
     QGeoCoordinate coord(
         location.value("Latitude"_L1).toDouble(),
         location.value("Longitude"_L1).toDouble()
@@ -169,7 +171,7 @@ void QGeoPositionInfoSourceXdg::locationUpdated([[maybe_unused]] const QDBusObje
     ts.beginStructure();
     ts >> secs >> µsecs;
     ts.endStructure();
-    m_lastPos.setTimestamp(QDateTime::fromMSecsSinceEpoch(secs * 1000 + µsecs / 1000, QTimeZone::UTC));
+    m_lastPos.setTimestamp(QDateTime::fromMSecsSinceEpoch((secs * 1000) + (µsecs / 1000), QTimeZone::UTC));
 
     Q_EMIT positionUpdated(m_lastPos);
 }

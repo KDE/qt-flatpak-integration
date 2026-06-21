@@ -12,8 +12,12 @@
 #include "logging.h"
 
 #include <QDBusConnection>
-#include <QDebug>
+#include <QGuiApplication>
 #include <QUuid>
+
+#include <private/qdesktopunixservices_p.h>
+#include <private/qguiapplication_p.h>
+#include <qpa/qplatformintegration.h>
 
 using namespace Qt::Literals;
 
@@ -32,13 +36,6 @@ QGeoPositionInfoSourceXdg::QGeoPositionInfoSourceXdg(const QVariantMap &paramete
     : QGeoPositionInfoSource(parent)
 {
     m_parentWindowId = parameters.value("parentWindowId"_L1).toString();
-    // TODO do we have chance to determine this ourselves?
-    /* given a window and linking to Qt::Gui we apparently can:
-    auto services = QGuiApplicationPrivate::platformIntegration()->services();
-    if (auto unixServices = dynamic_cast<QDesktopUnixServices *>(services)) {
-        return unixServices->portalWindowIdentifier(window);
-    }
-    */
 
     m_requestTimer.setSingleShot(true);
     connect(&m_requestTimer, &QTimer::timeout, this, &QGeoPositionInfoSourceXdg::stopUpdates);
@@ -138,6 +135,7 @@ void QGeoPositionInfoSourceXdg::connectToPortal()
         QVariantMap startArgs{
             { "handle_token"_L1, QUuid::createUuid().toString(QUuid::Id128) }
         };
+        determineWindowId();
         qCDebug(Log) << "starting portal request" << m_parentWindowId << startArgs;
         const auto requestReply = m_interface->Start(sessionHandle, m_parentWindowId, startArgs);
         const auto requestReplyWatcher = new QDBusPendingCallWatcher(requestReply, this);
@@ -193,6 +191,21 @@ void QGeoPositionInfoSourceXdg::locationUpdated([[maybe_unused]] const QDBusObje
     m_lastPos.setTimestamp(QDateTime::fromMSecsSinceEpoch((secs * 1000) + (µsecs / 1000), QTimeZone::UTC));
 
     Q_EMIT positionUpdated(m_lastPos);
+}
+
+void QGeoPositionInfoSourceXdg::determineWindowId()
+{
+    // try to guess the window id if not provided
+    if (m_parentWindowId.isEmpty()) {
+        const auto services = QGuiApplicationPrivate::platformIntegration()->services();
+        if (const auto unixServices = dynamic_cast<QDesktopUnixServices*>(services)) {
+            for (const auto window : QGuiApplication::topLevelWindows()) {
+                if (m_parentWindowId = unixServices->portalWindowIdentifier(window); !m_parentWindowId.isEmpty()) {
+                    break;
+                }
+            }
+        }
+    }
 }
 
 #include "moc_qgeopositioninfosource_xdg.cpp"

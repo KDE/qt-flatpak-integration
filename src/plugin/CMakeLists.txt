@@ -17,7 +17,7 @@ target_sources(libqtposition_xdg PRIVATE
     qgeopositioninfosourcefactory_xdg.cpp
     ${xdg_iface_srcs}
 )
-target_link_libraries(libqtposition_xdg PRIVATE Qt::DBus Qt::Positioning)
+target_link_libraries(libqtposition_xdg PRIVATE Qt::DBus Qt::Positioning Qt::Gui Qt::GuiPrivate)
 
 install(TARGETS libqtposition_xdg DESTINATION ${KDE_INSTALL_QTPLUGINDIR}/position/)
 ecm_qt_install_logging_categories(

@@ -37,6 +37,7 @@ private:
     void setError(QGeoPositionInfoSource::Error error);
     void locationUpdated(const QDBusObjectPath &handle, const QVariantMap &location);
 
+    void determineWindowId();
     QString m_parentWindowId;
 
     std::unique_ptr<OrgFreedesktopPortalLocationInterface> m_interface;

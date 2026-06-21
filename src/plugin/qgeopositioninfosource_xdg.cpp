@@ -57,6 +57,22 @@ QGeoPositionInfoSource::PositioningMethods QGeoPositionInfoSourceXdg::supportedP
     return QGeoPositionInfoSource::AllPositioningMethods;
 }
 
+void QGeoPositionInfoSourceXdg::setPreferredPositioningMethods(QGeoPositionInfoSource::PositioningMethods methods)
+{
+    const auto needsRestart = m_interface && preferredPositioningMethods() != methods;
+    const auto remainingTime = m_requestTimer.remainingTime();
+    qCDebug(Log) << "setPreferredPositioningMethods" << methods << preferredPositioningMethods() << needsRestart << remainingTime;
+    QGeoPositionInfoSource::setPreferredPositioningMethods(methods);
+    if (needsRestart) {
+        stopUpdates();
+        if (remainingTime > 0) {
+            requestUpdate(remainingTime);
+        } else {
+            startUpdates();
+        }
+    }
+}
+
 int QGeoPositionInfoSourceXdg::minimumUpdateInterval() const
 {
     return 1000;

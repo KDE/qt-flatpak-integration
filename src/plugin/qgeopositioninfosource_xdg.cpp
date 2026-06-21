@@ -145,7 +145,7 @@ void QGeoPositionInfoSourceXdg::connectToPortal()
     };
     qCDebug(Log) << "creating session" << args;
     const auto createSessionReply = m_interface->CreateSession(args);
-    const auto createSessionReplyWatcher = new QDBusPendingCallWatcher(createSessionReply, this);
+    const auto createSessionReplyWatcher = new QDBusPendingCallWatcher(createSessionReply, m_interface.get());
     connect(createSessionReplyWatcher, &QDBusPendingCallWatcher::finished, this, [this](auto watcher) {
         watcher->deleteLater();
         const QDBusPendingReply<QDBusObjectPath> createSessionReply = *watcher;
@@ -165,7 +165,7 @@ void QGeoPositionInfoSourceXdg::connectToPortal()
         determineWindowId();
         qCDebug(Log) << "starting portal request" << m_parentWindowId << startArgs;
         const auto requestReply = m_interface->Start(sessionHandle, m_parentWindowId, startArgs);
-        const auto requestReplyWatcher = new QDBusPendingCallWatcher(requestReply, this);
+        const auto requestReplyWatcher = new QDBusPendingCallWatcher(requestReply, m_interface.get());
         connect(requestReplyWatcher, &QDBusPendingCallWatcher::finished, this, [this](auto watcher) {
             watcher->deleteLater();
             const QDBusPendingReply<QDBusObjectPath> requestReply = *watcher;
@@ -177,7 +177,7 @@ void QGeoPositionInfoSourceXdg::connectToPortal()
                 if (response != 0) {
                     setError(QGeoPositionInfoSource::AccessError); // TODO diferentiate response codes?
                     m_session.reset();
-                    m_interface.reset();
+                    m_interface.release()->deleteLater(); // we are still in the watcher signal processing
                 }
                 m_request.release()->deleteLater();
             });

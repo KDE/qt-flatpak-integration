@@ -31,6 +31,7 @@ public:
     void startUpdates() override;
     void stopUpdates() override;
     void requestUpdate(int timeout) override;
+    bool setBackendProperty(const QString &name, const QVariant &value) override;
 
 private:
     void connectToPortal();

@@ -104,6 +104,17 @@ void QGeoPositionInfoSourceXdg::requestUpdate(int timeout)
     m_requestTimer.start();
 }
 
+bool QGeoPositionInfoSourceXdg::setBackendProperty(const QString &name, const QVariant &value)
+{
+    qCDebug(Log) << "setBackendProperty" << name << value;
+    if (name == "parentWindowId"_L1) {
+        m_parentWindowId = value.toString();
+        return true;
+    }
+
+    return QGeoPositionInfoSource::setBackendProperty(name, value);
+}
+
 void QGeoPositionInfoSourceXdg::connectToPortal()
 {
     setError(QGeoPositionInfoSource::NoError);

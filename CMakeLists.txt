@@ -33,7 +33,7 @@ ecm_setup_version(PROJECT
     SOVERSION 1
 )
 
-find_package(Qt6 REQUIRED COMPONENTS DBus Gui GuiPrivate Location Network Positioning Quick Widgets Test)
+find_package(Qt6 REQUIRED COMPONENTS CorePrivate DBus Gui GuiPrivate Location Network Positioning Quick Widgets Test)
 find_package(KF6 REQUIRED COMPONENTS DNSSD Kirigami)
 
 find_file(XDG_LOCATION_XML NAME org.freedesktop.portal.Location.xml PATH_SUFFIXES share/dbus-1/interfaces REQUIRED)

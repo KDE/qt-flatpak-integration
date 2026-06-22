@@ -22,6 +22,7 @@
 using namespace Qt::Literals;
 
 static constexpr inline const auto PORTAL_SERVICE_NAME = "org.freedesktop.portal.Desktop"_L1;
+static constexpr inline const auto PORTAL_PATH = "/org/freedesktop/portal/desktop"_L1;
 
 enum XdgAccuracy {
     NONE = 0,
@@ -135,7 +136,7 @@ void QGeoPositionInfoSourceXdg::connectToPortal()
 {
     setError(QGeoPositionInfoSource::NoError);
 
-    m_interface = std::make_unique<OrgFreedesktopPortalLocationInterface>(PORTAL_SERVICE_NAME, u"/org/freedesktop/portal/desktop"_s, QDBusConnection::sessionBus());
+    m_interface = std::make_unique<OrgFreedesktopPortalLocationInterface>(PORTAL_SERVICE_NAME, PORTAL_PATH, QDBusConnection::sessionBus());
     connect(m_interface.get(), &OrgFreedesktopPortalLocationInterface::LocationUpdated, this, &QGeoPositionInfoSourceXdg::locationUpdated);
     QVariantMap args{
         { "session_handle_token"_L1, QUuid::createUuid().toString(QUuid::Id128) },
@@ -159,8 +160,21 @@ void QGeoPositionInfoSourceXdg::connectToPortal()
             m_request.reset();
             m_interface.reset();
         });
+
+        // we have to predict the D-Bus path of the request so we can connect
+        // before calling Start(), otherwise we risk missing the signal
+        // see org.freedesktop.portal.Request.xml for an explanation of this race
+        // and the recommended way of handling this
+        const auto requestToken = QUuid::createUuid().toString(QUuid::Id128);
+        const QString requestPath = PORTAL_PATH + "/request/"_L1
+            + QDBusConnection::sessionBus().baseService().remove(':'_L1).replace('.'_L1, '_'_L1)
+            + '/'_L1 + requestToken;
+        qCDebug(Log) << "watching predicted request path" << requestPath;
+        m_request = std::make_unique<OrgFreedesktopPortalRequestInterface>(PORTAL_SERVICE_NAME, requestPath, QDBusConnection::sessionBus());
+        connect(m_request.get(), &OrgFreedesktopPortalRequestInterface::Response, this, &QGeoPositionInfoSourceXdg::requestResponse);
+
         QVariantMap startArgs{
-            { "handle_token"_L1, QUuid::createUuid().toString(QUuid::Id128) }
+            { "handle_token"_L1, requestToken }
         };
         determineWindowId();
         qCDebug(Log) << "starting portal request" << m_parentWindowId << startArgs;
@@ -171,18 +185,30 @@ void QGeoPositionInfoSourceXdg::connectToPortal()
             const QDBusPendingReply<QDBusObjectPath> requestReply = *watcher;
             const QDBusObjectPath reqHandle = requestReply;
             qCDebug(Log) << "portal request created:" << reqHandle;
-            m_request = std::make_unique<OrgFreedesktopPortalRequestInterface>(PORTAL_SERVICE_NAME, reqHandle.path(), QDBusConnection::sessionBus());
-            connect(m_request.get(), &OrgFreedesktopPortalRequestInterface::Response, this, [this](auto response, const auto &results) {
-                qCDebug(Log) << "request response" << response << results;
-                if (response != 0) {
-                    setError(QGeoPositionInfoSource::AccessError); // TODO diferentiate response codes?
-                    m_session.reset();
-                    m_interface.release()->deleteLater(); // we are still in the watcher signal processing
-                }
-                m_request.release()->deleteLater();
-            });
+            if (reqHandle.path() != m_request->path()) {
+                qCWarning(Log) << "predicted request path did not match!";
+                m_request = std::make_unique<OrgFreedesktopPortalRequestInterface>(PORTAL_SERVICE_NAME, reqHandle.path(), QDBusConnection::sessionBus());
+                connect(m_request.get(), &OrgFreedesktopPortalRequestInterface::Response, this, &QGeoPositionInfoSourceXdg::requestResponse);
+            }
         });
     });
+}
+
+void QGeoPositionInfoSourceXdg::requestResponse(quint32 response, const QVariantMap &results)
+{
+    if (!m_request) {
+        // no request in progress
+        return;
+    }
+
+    qCDebug(Log) << "request response" << response << results;
+    if (response != 0) {
+        setError(QGeoPositionInfoSource::AccessError); // TODO diferentiate response codes?
+        m_session.reset();
+        m_interface.release()->deleteLater(); // we are potentially still in the watcher signal processing
+    }
+
+    m_request.release()->deleteLater();
 }
 
 void QGeoPositionInfoSourceXdg::setError(QGeoPositionInfoSource::Error error)

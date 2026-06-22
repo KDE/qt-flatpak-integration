@@ -34,6 +34,9 @@ public:
     void requestUpdate(int timeout) override;
     bool setBackendProperty(const QString &name, const QVariant &value) override;
 
+private Q_SLOTS:
+    void requestResponse(quint32 response, const QVariantMap &results);
+
 private:
     void connectToPortal();
     void setError(QGeoPositionInfoSource::Error error);

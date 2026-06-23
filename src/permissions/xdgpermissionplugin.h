@@ -5,6 +5,8 @@
 
 #include <private/qpermissions_p.h>
 
+#include <QMap>
+
 class XdgPermissionPlugin : public QPermissionPlugin
 {
     Q_OBJECT
@@ -18,5 +20,7 @@ public:
     void requestPermission(const QPermission &permission, const QPermissions::Private::PermissionCallback &callback) override;
 
 private:
-    Qt::PermissionStatus m_locationPermission = Qt::PermissionStatus::Undetermined;
+    [[nodiscard]] QString parentWindowId() const;
+
+    QMap<QLocationPermission::Accuracy, Qt::PermissionStatus> m_locationPermission;
 };

@@ -28,6 +28,7 @@ public:
     [[nodiscard]] PositioningMethods supportedPositioningMethods() const override;
     void setPreferredPositioningMethods(QGeoPositionInfoSource::PositioningMethods methods) override;
     [[nodiscard]] int minimumUpdateInterval() const override;
+    void setUpdateInterval(int msec) override;
     [[nodiscard]] Error error() const override;
     void startUpdates() override;
     void stopUpdates() override;

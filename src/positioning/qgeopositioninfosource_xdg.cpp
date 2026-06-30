@@ -79,6 +79,22 @@ int QGeoPositionInfoSourceXdg::minimumUpdateInterval() const
     return 1000;
 }
 
+void QGeoPositionInfoSourceXdg::setUpdateInterval(int msec)
+{
+    const auto needsRestart = m_interface && updateInterval() != msec;
+    const auto remainingTime = m_requestTimer.remainingTime();
+    qCDebug(Log) << "setUpdateInterval" << msec << updateInterval() << needsRestart << remainingTime;
+    QGeoPositionInfoSource::setUpdateInterval(msec);
+    if (needsRestart) {
+        stopUpdates();
+        if (remainingTime > 0) {
+            requestUpdate(remainingTime);
+        } else {
+            startUpdates();
+        }
+    }
+}
+
 QGeoPositionInfoSource::Error QGeoPositionInfoSourceXdg::error() const
 {
     return m_error;

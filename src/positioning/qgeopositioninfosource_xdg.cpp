@@ -203,7 +203,7 @@ void QGeoPositionInfoSourceXdg::requestResponse(quint32 response, const QVariant
 
     qCDebug(Log) << "request response" << response << results;
     if (response != 0) {
-        setError(QGeoPositionInfoSource::AccessError); // TODO diferentiate response codes?
+        setError(response == 1 ? QGeoPositionInfoSource::AccessError : QGeoPositionInfoSource::ClosedError);
         m_session.reset();
         m_interface.release()->deleteLater(); // we are potentially still in the watcher signal processing
     }

@@ -48,16 +48,25 @@ Qt::PermissionStatus XdgPermissionPlugin::checkPermission(const QPermission &per
     return Qt::PermissionStatus::Undetermined;
 }
 
+struct LocationPermissionRequest
+{
+    QLocationPermission::Accuracy accuracy;
+    QPermissions::Private::PermissionCallback callback;
+    OrgFreedesktopPortalLocationInterface *portalIface = nullptr;
+};
+
 void XdgPermissionPlugin::requestPermission(const QPermission &permission, const QPermissions::Private::PermissionCallback &callback)
 {
     qCInfo(Log) << "requestPermission" << permission.type().name();
     if (permission.type().id() == qMetaTypeId<QLocationPermission>()) {
-        const auto accuracy = permission.value<QLocationPermission>().value().accuracy();
+        LocationPermissionRequest req;
+        req.accuracy = permission.value<QLocationPermission>().value().accuracy();
+        req.callback = callback;
 
-        auto portalIface = new OrgFreedesktopPortalLocationInterface(PORTAL_SERVICE_NAME, PORTAL_PATH, QDBusConnection::sessionBus(), this);
-        if (!portalIface->isValid()) {
+        req.portalIface = new OrgFreedesktopPortalLocationInterface(PORTAL_SERVICE_NAME, PORTAL_PATH, QDBusConnection::sessionBus(), this);
+        if (!req.portalIface->isValid()) {
             // no portal
-            m_locationPermission[accuracy] = Qt::PermissionStatus::Granted;
+            m_locationPermission[req.accuracy] = Qt::PermissionStatus::Granted;
             callback(Qt::PermissionStatus::Granted);
         }
 
@@ -65,21 +74,21 @@ void XdgPermissionPlugin::requestPermission(const QPermission &permission, const
             { "session_handle_token"_L1, QUuid::createUuid().toString(QUuid::Id128) },
             { "distance-threshold"_L1, 0 },
             { "time-threshold"_L1, 0 },
-            { "accuracy"_L1, accuracy == QLocationPermission::Precise ? XdgAccuracy::EXACT : XdgAccuracy::CITY },
+            { "accuracy"_L1, req.accuracy == QLocationPermission::Precise ? XdgAccuracy::EXACT : XdgAccuracy::CITY },
         };
         qCDebug(Log) << "creating session" << args;
-        const auto createSessionReply = portalIface->CreateSession(args);
-        const auto createSessionReplyWatcher = new QDBusPendingCallWatcher(createSessionReply, portalIface);
-        connect(createSessionReplyWatcher, &QDBusPendingCallWatcher::finished, this, [this, accuracy, portalIface, callback](auto watcher) {
+        const auto createSessionReply = req.portalIface->CreateSession(args);
+        const auto createSessionReplyWatcher = new QDBusPendingCallWatcher(createSessionReply, req.portalIface);
+        connect(createSessionReplyWatcher, &QDBusPendingCallWatcher::finished, this, [this, req](auto watcher) {
             watcher->deleteLater();
             const QDBusPendingReply<QDBusObjectPath> createSessionReply = *watcher;
             const QDBusObjectPath sessionHandle = createSessionReply;
             qCDebug(Log) << "got portal session" << sessionHandle;
-            auto session = new OrgFreedesktopPortalSessionInterface(PORTAL_SERVICE_NAME, sessionHandle.path(), QDBusConnection::sessionBus(), portalIface);
-            connect(session, &OrgFreedesktopPortalSessionInterface::Closed, this, [this, callback, portalIface](const auto &args) {
+            auto session = new OrgFreedesktopPortalSessionInterface(PORTAL_SERVICE_NAME, sessionHandle.path(), QDBusConnection::sessionBus(), req.portalIface);
+            connect(session, &OrgFreedesktopPortalSessionInterface::Closed, this, [this, req](const auto &args) {
                 qCInfo(Log) << "portal session closed" << args;
-                callback(Qt::PermissionStatus::Undetermined);
-                portalIface->deleteLater();
+                req.callback(Qt::PermissionStatus::Undetermined);
+                req.portalIface->deleteLater();
             });
 
             // we have to predict the D-Bus path of the request so we can connect
@@ -91,21 +100,9 @@ void XdgPermissionPlugin::requestPermission(const QPermission &permission, const
                 + QDBusConnection::sessionBus().baseService().remove(':'_L1).replace('.'_L1, '_'_L1)
                 + '/'_L1 + requestToken;
             qCDebug(Log) << "watching predicted request path" << requestPath;
-            auto request = new OrgFreedesktopPortalRequestInterface(PORTAL_SERVICE_NAME, requestPath, QDBusConnection::sessionBus(), session);
-            connect(request, &OrgFreedesktopPortalRequestInterface::Response, this, [this, accuracy, portalIface, callback](quint32 response, const QVariantMap &results) {
-                switch (response) {
-                    case 0:
-                        m_locationPermission[accuracy] = Qt::PermissionStatus::Granted;
-                        break;
-                    case 1:
-                        m_locationPermission[accuracy] = Qt::PermissionStatus::Denied;
-                        break;
-                    default:
-                        qCWarning(Log) << "got unhandled permission response code:" << response;
-                };
-                qCInfo(Log) << "got permission reponse" << m_locationPermission[accuracy] << results;
-                callback(m_locationPermission[accuracy]);
-                portalIface->deleteLater();
+            auto requestIface = new OrgFreedesktopPortalRequestInterface(PORTAL_SERVICE_NAME, requestPath, QDBusConnection::sessionBus(), session);
+            connect(requestIface, &OrgFreedesktopPortalRequestInterface::Response, this, [this, req](quint32 response, const QVariantMap &results) {
+                locationRequestResponse(req, response, results);
             });
 
             QVariantMap startArgs{
@@ -113,16 +110,19 @@ void XdgPermissionPlugin::requestPermission(const QPermission &permission, const
             };
             const auto winId = parentWindowId();
             qCDebug(Log) << "starting portal request" << winId << startArgs;
-            const auto requestReply = portalIface->Start(sessionHandle, winId, startArgs);
-            const auto requestReplyWatcher = new QDBusPendingCallWatcher(requestReply, portalIface);
-            connect(requestReplyWatcher, &QDBusPendingCallWatcher::finished, this, [this, portalIface, request](auto watcher) {
+            const auto requestReply = req.portalIface->Start(sessionHandle, winId, startArgs);
+            const auto requestReplyWatcher = new QDBusPendingCallWatcher(requestReply, req.portalIface);
+            connect(requestReplyWatcher, &QDBusPendingCallWatcher::finished, this, [this, req, requestIface](auto watcher) {
                 watcher->deleteLater();
                 const QDBusPendingReply<QDBusObjectPath> requestReply = *watcher;
                 const QDBusObjectPath reqHandle = requestReply;
                 qCDebug(Log) << "portal request created:" << reqHandle;
-                if (reqHandle.path() != request->path()) {
+                if (reqHandle.path() != requestIface->path()) {
                     qCWarning(Log) << "predicted request path did not match!";
-                    // TODO handle this
+                    auto requestIface = new OrgFreedesktopPortalRequestInterface(PORTAL_SERVICE_NAME, reqHandle.path(), QDBusConnection::sessionBus(), req.portalIface);
+                    connect(requestIface, &OrgFreedesktopPortalRequestInterface::Response, this, [this, req](quint32 response, const QVariantMap &results) {
+                        locationRequestResponse(req, response, results);
+                    });
                 }
             });
         });
@@ -130,6 +130,23 @@ void XdgPermissionPlugin::requestPermission(const QPermission &permission, const
 
     callback(Qt::PermissionStatus::Undetermined);
 };
+
+void XdgPermissionPlugin::locationRequestResponse(const LocationPermissionRequest &req, quint32 response, const QVariantMap &results)
+{
+    switch (response) {
+        case 0:
+            m_locationPermission[req.accuracy] = Qt::PermissionStatus::Granted;
+            break;
+        case 1:
+            m_locationPermission[req.accuracy] = Qt::PermissionStatus::Denied;
+            break;
+        default:
+            qCWarning(Log) << "got unhandled permission response code:" << response;
+    };
+    qCInfo(Log) << "got permission reponse" << m_locationPermission[req.accuracy] << results;
+    req.callback(m_locationPermission[req.accuracy]);
+    req.portalIface->deleteLater();
+}
 
 QString XdgPermissionPlugin::parentWindowId() const
 {

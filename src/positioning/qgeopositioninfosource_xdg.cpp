@@ -248,7 +248,9 @@ void QGeoPositionInfoSourceXdg::locationUpdated([[maybe_unused]] const QDBusObje
     }
     m_lastPos = {};
     m_lastPos.setCoordinate(coord);
-    m_lastPos.setAttribute(QGeoPositionInfo::GroundSpeed, location.value("Speed"_L1).toDouble());
+    if (const auto speed = location.value("Speed"_L1).toDouble(); speed >= 0.0) {
+        m_lastPos.setAttribute(QGeoPositionInfo::GroundSpeed, speed);
+    }
     if (const auto heading = location.value("Heading"_L1).toDouble(); heading >= 0.0) {
         // Geoclue sends -1.0 for unknown heading
         m_lastPos.setAttribute(QGeoPositionInfo::Direction, heading);

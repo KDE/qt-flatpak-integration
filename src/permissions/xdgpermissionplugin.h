@@ -24,7 +24,7 @@ public:
 private:
     void locationRequestResponse(const LocationPermissionRequest &req, quint32 response, const QVariantMap &results);
 
-    [[nodiscard]] QString parentWindowId() const;
+    [[nodiscard]] static QString parentWindowId();
 
     QMap<QLocationPermission::Accuracy, Qt::PermissionStatus> m_locationPermission;
 };

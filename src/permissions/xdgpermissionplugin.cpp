@@ -148,15 +148,10 @@ void XdgPermissionPlugin::locationRequestResponse(const LocationPermissionReques
     req.portalIface->deleteLater();
 }
 
-QString XdgPermissionPlugin::parentWindowId() const
+QString XdgPermissionPlugin::parentWindowId()
 {
-    const auto services = QGuiApplicationPrivate::platformIntegration()->services();
-    if (const auto unixServices = dynamic_cast<QDesktopUnixServices*>(services)) {
-        for (const auto window : QGuiApplication::topLevelWindows()) {
-            if (auto winId = unixServices->portalWindowIdentifier(window); !winId.isEmpty()) {
-                return winId;
-            }
-        }
-    }
-    return {};
+    const auto unixServices = dynamic_cast<QDesktopUnixServices *>(QGuiApplicationPrivate::platformIntegration()->services());
+    return QGuiApplication::focusWindow() && unixServices
+        ? unixServices->portalWindowIdentifier(QGuiApplication::focusWindow())
+        : QString();
 }

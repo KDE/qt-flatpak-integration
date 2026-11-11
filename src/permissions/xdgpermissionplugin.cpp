@@ -85,7 +85,7 @@ void XdgPermissionPlugin::requestPermission(const QPermission &permission, const
             const QDBusObjectPath sessionHandle = createSessionReply;
             qCDebug(Log) << "got portal session" << sessionHandle;
             auto session = new OrgFreedesktopPortalSessionInterface(PORTAL_SERVICE_NAME, sessionHandle.path(), QDBusConnection::sessionBus(), req.portalIface);
-            connect(session, &OrgFreedesktopPortalSessionInterface::Closed, this, [this, req](const auto &args) {
+            connect(session, &OrgFreedesktopPortalSessionInterface::Closed, this, [req](const auto &args) {
                 qCInfo(Log) << "portal session closed" << args;
                 req.callback(Qt::PermissionStatus::Undetermined);
                 req.portalIface->deleteLater();

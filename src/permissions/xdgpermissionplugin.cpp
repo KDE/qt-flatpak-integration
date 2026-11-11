@@ -39,8 +39,9 @@ XdgPermissionPlugin::~XdgPermissionPlugin() = default;
 
 Qt::PermissionStatus XdgPermissionPlugin::checkPermission(const QPermission &permission)
 {
-    if (permission.type().id() == qMetaTypeId<QLocationPermission>()) {
-        const auto accuracy = permission.value<QLocationPermission>().value().accuracy();
+    const std::optional<QLocationPermission> locationPermission = permission.value<QLocationPermission>();
+    if (locationPermission) {
+        const auto accuracy = locationPermission.value().accuracy();
         return m_locationPermission.value(accuracy, Qt::PermissionStatus::Undetermined);
     }
 
@@ -58,9 +59,10 @@ struct LocationPermissionRequest
 void XdgPermissionPlugin::requestPermission(const QPermission &permission, const QPermissions::Private::PermissionCallback &callback)
 {
     qCInfo(Log) << "requestPermission" << permission.type().name();
-    if (permission.type().id() == qMetaTypeId<QLocationPermission>()) {
+    const std::optional<QLocationPermission> locationPermission = permission.value<QLocationPermission>();
+    if (locationPermission) {
         LocationPermissionRequest req;
-        req.accuracy = permission.value<QLocationPermission>().value().accuracy();
+        req.accuracy = locationPermission.value().accuracy();
         req.callback = callback;
 
         req.portalIface = new OrgFreedesktopPortalLocationInterface(PORTAL_SERVICE_NAME, PORTAL_PATH, QDBusConnection::sessionBus(), this);
